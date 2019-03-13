@@ -1,0 +1,4 @@
+docker/config.env
+docker/build.sh
+docker/push.sh
+docker/run.sh
