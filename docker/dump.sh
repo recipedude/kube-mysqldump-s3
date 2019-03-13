@@ -1,6 +1,6 @@
 #!/bin/bash
 
-
+# env vars (mainly for convienience)
 ALL_DATABASES=${ALL_DATABASES}
 BZIP2_OPTIONS=${BZIP2_OPTIONS}
 DB_HOST=${DB_HOST}
@@ -12,6 +12,10 @@ IGNORE_DATABASE=${IGNORE_DATABASE}
 MISSING=false
 TIMESTAMP=${TIMESTAMP}
 AWS_BUCKET=${AWS_BUCKET}
+
+#
+# validate all env vars have been provided and error on missing env vars
+#
 
 if [[ $DB_HOST == "" ]]; then
 	echo "Missing DB_HOST"
@@ -60,49 +64,53 @@ if [[ $MISSING == "true" ]]; then
 	exit 1
 fi
 
+#
+# Create ~/.my.cnf to avoid passing password on command line
+#
 
+echo "[mysqldump]" > ~/.my.cnf
+echo "user=$DB_USER" >> ~/.my.cnf
+echo "password=$DB_PASS" >> ~/.my.cnf
 
-echo "[msyqldump]\nuser=$DB_USER\npassword=$DB_PASSWORD\n" > ~/.my.cnf
-
+# timestamp option
 
 if [[ $TIMESTAMP == "date" ]]; then
-	PREFIX=`date +%Y-%m-%d`
+	PREFIX=`date +%Y-%m-%d`_
 fi
 
 if [[ $ALL_DATABASES == "" ]]; then
 
-	FILENAME=$PREFIX\_$DB_NAME.sql.bz2
+	#
+	# dump a single database
+	#
+
+	FILENAME=$PREFIX$DB_NAME.sql.bz2
 
 	echo "Dumping database: $DB_NAME to $FILENAME"
-#	CMD="mysqldump --host="$DB_HOST" $DUMP_OPTIONS "$DB_NAME" > "/data/$FILENAME""
-#	echo $CMD
 	mysqldump --host="$DB_HOST" $DUMP_OPTIONS "$DB_NAME" | bzip2 $BZIP2_OPTIONS > "/data/$FILENAME"
-
 	aws s3 cp "/data/$FILENAME" $AWS_BUCKET
 
 else
 
-	echo "Backing up all databases"
+	#
+	# dump all databases
+	#
+
+	echo "Dumping all databases"
 	databases=`mysql --host="${DB_HOST}" -e "SHOW DATABASES;" | tr -d "| " | grep -v Database`
 	for db in $databases; do
     if [[ "$db" != "information_schema" ]] && [[ "$db" != "performance_schema" ]] && [[ "$db" != "mysql" ]] && [[ "$db" != _* ]] && [[ "$db" != "$IGNORE_DATABASE" ]]; then
       
-			FILENAME=$PREFIX\_$db.sql.bz2
+			FILENAME=$PREFIX$db.sql.bz2
 
 			echo "Dumping database: $db to $FILENAME"
-#			CMD="mysqldump --host="$DB_HOST" $DUMP_OPTIONS "$db" > "/data/$FILENAME""
-#			echo $CMD
 			mysqldump --host="$DB_HOST" $DUMP_OPTIONS "$db" | bzip2 $BZIP2_OPTIONS > "/data/$FILENAME"
-
-			# to do: upload to S3
-
 			aws s3 cp "/data/$FILENAME" $AWS_BUCKET
-
 			echo ""
 
     fi
-done
-
+	done
 
 fi
 
+echo "Dump completed"
