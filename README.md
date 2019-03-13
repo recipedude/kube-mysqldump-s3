@@ -1,6 +1,8 @@
 # kube-mysqldump-s3
 Backup MySQL/MariaDB databases using Docker and/or Kubernetes cronjobs to/from AWS S3
 
+This repo is a work in progress, although it is functional, more documentation is needed.
+
 ## Features
 
 - dump a single or multiple databases
